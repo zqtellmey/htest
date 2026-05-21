@@ -20,7 +20,6 @@ async function main() {
     const tgToken = process.env.TELEGRAM_BOT_TOKEN;
     const tgChatId = process.env.TELEGRAM_CHAT_ID;
 
-    // CloakBrowser 启动器
     console.log("🚀 启动 CloakBrowser...");
     const browser = await launch({ 
         headless: true,
@@ -30,22 +29,36 @@ async function main() {
     const page = await browser.newPage();
     await page.setViewportSize({ width: 1920, height: 1080 });
 
+    // 1. 恢复去广告拦截规则
+    const adDomains = ['googlesyndication.com', 'doubleclick.net', 'googleadservices.com', 'popads.net', 'propellerads.com', 'monetag.com', 'a-ads.com', 'mellowads.com'];
+    await page.route('**/*', route => {
+        adDomains.some(domain => route.request().url().includes(domain)) ? route.abort() : route.continue();
+    });
+
     try {
         console.log(`🌐 访问: ${renewUrl}`);
         await page.goto(renewUrl, { waitUntil: 'networkidle' });
 
-        // 1. 点击第一个 Renew 按钮
-        console.log("👆 点击第一个 Renew 按钮...");
-        await page.click('xpath=//*[@id="renew"]/div[2]/center/div/button');
+        // 2. 恢复 CSS 屏蔽样式 (防止广告层遮挡按钮)
+        await page.addStyleTag({ content: `ins.adsbygoogle, div[id^="google_ads"], div[class*="ad-container"], .adsbygoogle { display: none !important; }` });
+
+        // 3. 稳健的第一个按钮点击逻辑
+        console.log("🔍 定位并点击第一个 Renew 按钮...");
+        const xpath1 = '//*[@id="renew"]/div[2]/center/div/button';
+        const btn1 = await page.waitForSelector(xpath1, { timeout: 20000, state: 'visible' });
+        await btn1.scrollIntoViewIfNeeded();
+        await page.waitForTimeout(1000);
+        await btn1.click();
         
-        // 2. 关键：这里什么都不做，只给时间
-        // 让 CloakBrowser 的环境自动识别并完成人机验证
-        console.log("⏳ 等待人机验证自动完成 (不进行点击操作)...");
+        console.log("✅ 点击成功，等待页面加载验证...");
         await page.waitForTimeout(20000); 
 
-        // 3. 直接点击第二个按钮 (假设此时验证已通过)
+        // 4. 点击第二个按钮 (保留你的业务逻辑)
         console.log("👆 点击第二个 Renew 按钮...");
-        await page.click('xpath=//*[@id="rm-body"]/div[6]/div/div[6]/button[1]');
+        const xpath2 = '//*[@id="rm-body"]/div[6]/div/div[6]/button[1]';
+        const btn2 = await page.waitForSelector(xpath2, { timeout: 20000, state: 'visible' });
+        await btn2.scrollIntoViewIfNeeded();
+        await btn2.click();
         
         console.log("✅ 流程结束。");
         await page.waitForTimeout(5000);
