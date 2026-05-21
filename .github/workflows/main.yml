@@ -17,50 +17,45 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v3
       with:
-        node-version: '18' # 推荐使用稳定的 Node.js 版本
+        node-version: '18'
 
     - name: Install dependencies
       run: |
         npm install
 
     - name: Install Playwright Browsers
-      # playwright-core 不自带浏览器，需要这一步来安装内核和系统依赖
       run: |
         npx playwright install chromium
         npx playwright install-deps chromium
 
     - name: Setup Gost Proxy
       run: |
-        # 1. 下载并解压 Gost
+        # 下载并解压 Gost
         wget -q https://github.com/ginuerzh/gost/releases/download/v2.11.5/gost-linux-amd64-2.11.5.gz
         gunzip -f gost-linux-amd64-2.11.5.gz
         chmod +x gost-linux-amd64-2.11.5
         
-        # 2. 启动 Gost 隧道，本地监听 1080 端口，上游转发至 Secrets 里的代理
+        # 启动 Gost 隧道
         echo "🔗 正在启动 Gost 隧道..."
         ./gost-linux-amd64-2.11.5 -L=http://:1080 -F="${{ secrets.SOCKS5_URL }}" > gost.log 2>&1 &
         
-        # 3. 等待代理隧道建立连接
+        # 等待隧道启动
         sleep 5
         
-        # 4. 连通性测试与环境变量自动注入
-        echo "--- 🌐 连通性测试 ---"
+        # 验证代理连通性并设置环境变量
         if curl -I -s --max-time 15 -x http://127.0.0.1:1080 https://www.google.com > /dev/null; then
-          echo "✅ Gost 代理启动成功并已连通！"
-          # 自动注入环境变量，让后续的 Node.js/Playwright 自动走代理
+          echo "✅ Gost 代理启动成功！"
           echo "ALL_PROXY=http://127.0.0.1:1080" >> $GITHUB_ENV
           echo "http_proxy=http://127.0.0.1:1080" >> $GITHUB_ENV
           echo "https_proxy=http://127.0.0.1:1080" >> $GITHUB_ENV
         else
-          echo "❌ Gost 代理连接失败，请检查 SOCKS5_URL 是否正确。"
-          echo "--- Gost 日志预览 ---"
+          echo "❌ Gost 代理连接失败，请检查 SOCKS5_URL 配置。"
           cat gost.log
           exit 1
         fi
 
     - name: Run Renew Script
       env:
-        # 读取 GitHub Secrets 中的变量
         RENEW_URL: ${{ secrets.RENEW_URL }}
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
