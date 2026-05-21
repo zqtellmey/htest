@@ -1,7 +1,7 @@
-const { launch } = require('cloakbrowser');
-const fs = require('fs');
-const axios = require('axios');
-const FormData = require('form-data');
+import { launch } from 'cloakbrowser';
+import fs from 'fs';
+import axios from 'axios';
+import FormData from 'form-data';
 
 // 发送截图到 Telegram 的辅助函数
 async function sendTelegramPhoto(token, chatId, photoPath, caption) {
@@ -81,7 +81,6 @@ async function main() {
         // 3. 谷歌人机验证打勾操作 (使用提供的 XPath 定位)
         console.log("🤖 开始处理谷歌人机验证...");
         try {
-            // 针对 reCAPTCHA，如果由于 iframe 嵌套找不到，可能会报错，但这里优先尝试你提供的 xpath
             const recaptchaCheckbox = await page.waitForSelector('xpath=//*[@id="recaptcha-anchor"]/div[1]', { timeout: 15000 });
             await recaptchaCheckbox.click();
             console.log("✅ 已点击人机验证框，等待验证通过...");
