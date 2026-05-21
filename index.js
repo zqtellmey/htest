@@ -44,10 +44,54 @@ async function main() {
     // 设置分辨率
     await page.setViewportSize({ width: 1920, height: 1080 });
 
+    // ================= 新增：去广告逻辑 (网络请求拦截) =================
+    console.log("🛡️ 正在配置去广告拦截规则...");
+    const adDomains = [
+        'googlesyndication.com',
+        'doubleclick.net',
+        'googleadservices.com',
+        'popads.net',
+        'propellerads.com',
+        'monetag.com',
+        'a-ads.com',
+        'mellowads.com'
+    ];
+    
+    await page.route('**/*', route => {
+        const url = route.request().url();
+        if (adDomains.some(domain => url.includes(domain))) {
+            // 拦截广告请求
+            route.abort();
+        } else {
+            route.continue();
+        }
+    });
+    // ===================================================================
+
     try {
         console.log(`🌐 正在访问网址: ${renewUrl}`);
         await page.goto(renewUrl, { waitUntil: 'networkidle' });
         await page.waitForTimeout(3000); // 等待3秒
+
+        // ================= 新增：去广告逻辑 (CSS 样式隐藏) =================
+        try {
+            console.log("🧹 正在清理页面上可能残留的广告元素...");
+            await page.addStyleTag({ content: `
+                ins.adsbygoogle, 
+                div[id^="google_ads"], 
+                div[class*="ad-container"], 
+                .adsbygoogle { 
+                    display: none !important; 
+                    height: 0 !important; 
+                    width: 0 !important; 
+                    pointer-events: none !important;
+                }
+            `});
+            console.log("✅ 页面广告元素已隐藏。");
+        } catch (e) {
+            console.log(`⚠️ 隐藏广告元素时出错 (可忽略): ${e.message}`);
+        }
+        // ===================================================================
 
         // 1. 检测并处理欧洲隐私同意框
         try {
@@ -78,18 +122,18 @@ async function main() {
             console.error(`❌ 点击第一个 Renew 按钮失败: ${e.message}`);
         }
 
-        // 3. 谷歌人机验证打勾操作 (处理 iframe 嵌套)
+        // 3. 谷歌人机验证打勾操作 (精准定位指定的 iframe)
         console.log("🤖 开始处理谷歌人机验证...");
         try {
-            console.log("🔍 正在查找 reCAPTCHA iframe...");
-            // 首先查找 src 包含 recaptcha 的 iframe 元素
-            const iframeElement = await page.waitForSelector('iframe[src*="recaptcha"]', { timeout: 15000 });
+            console.log("🔍 正在精准查找可见的 reCAPTCHA iframe...");
+            // 使用你提供的精确 XPath 定位正确的 iframe
+            const iframeElement = await page.waitForSelector('xpath=//*[@id="recaptchax"]/div/div/iframe', { timeout: 15000 });
             // 获取该 iframe 的内部执行环境
             const frame = await iframeElement.contentFrame();
             
             if (frame) {
                 console.log("✅ 成功进入 iframe，准备定位打勾框...");
-                // 在 iframe 内部使用 XPath 定位并点击
+                // 在 iframe 内部使用 XPath 定位打勾元素并点击
                 const recaptchaCheckbox = await frame.waitForSelector('xpath=//*[@id="recaptcha-anchor"]/div[1]', { timeout: 15000 });
                 await recaptchaCheckbox.click();
                 console.log("✅ 已点击人机验证框，等待验证通过...");
