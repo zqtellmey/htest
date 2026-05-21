@@ -73,25 +73,38 @@ async function main() {
             const renewBtn1 = await page.waitForSelector('xpath=//*[@id="renew"]/div[2]/center/div/button', { timeout: 10000 });
             await renewBtn1.click();
             console.log("✅ 已点击第一个 Renew 按钮。");
-            await page.waitForTimeout(3000); // 等待悬浮框弹出
+            await page.waitForTimeout(4000); // 等待悬浮框及人机验证 iframe 彻底加载弹出
         } catch (e) {
             console.error(`❌ 点击第一个 Renew 按钮失败: ${e.message}`);
         }
 
-        // 3. 谷歌人机验证打勾操作 (使用提供的 XPath 定位)
+        // 3. 谷歌人机验证打勾操作 (处理 iframe 嵌套)
         console.log("🤖 开始处理谷歌人机验证...");
         try {
-            const recaptchaCheckbox = await page.waitForSelector('xpath=//*[@id="recaptcha-anchor"]/div[1]', { timeout: 15000 });
-            await recaptchaCheckbox.click();
-            console.log("✅ 已点击人机验证框，等待验证通过...");
-            await page.waitForTimeout(6000); // 给予验证码转圈和打勾充足的时间
+            console.log("🔍 正在查找 reCAPTCHA iframe...");
+            // 首先查找 src 包含 recaptcha 的 iframe 元素
+            const iframeElement = await page.waitForSelector('iframe[src*="recaptcha"]', { timeout: 15000 });
+            // 获取该 iframe 的内部执行环境
+            const frame = await iframeElement.contentFrame();
+            
+            if (frame) {
+                console.log("✅ 成功进入 iframe，准备定位打勾框...");
+                // 在 iframe 内部使用 XPath 定位并点击
+                const recaptchaCheckbox = await frame.waitForSelector('xpath=//*[@id="recaptcha-anchor"]/div[1]', { timeout: 15000 });
+                await recaptchaCheckbox.click();
+                console.log("✅ 已点击人机验证框，等待验证通过...");
+                await page.waitForTimeout(8000); // 给予验证码转圈和打勾充足的时间
+            } else {
+                console.error("❌ 找到了 iframe 元素，但无法获取其内容框架 (contentFrame)。");
+            }
         } catch (e) {
-            console.error(`❌ 查找或点击人机验证框失败，如果它在 iframe 内后续可能需要调整: ${e.message}`);
+            console.error(`❌ 查找或点击人机验证框失败: ${e.message}`);
         }
 
         // 4. 点击悬浮框中的第二个 Renew 按钮
         try {
             console.log("👆 准备点击第二个 Renew 按钮...");
+            // 第二个按钮在主页面中，所以直接使用 page 去查找
             const renewBtn2 = await page.waitForSelector('xpath=//*[@id="rm-body"]/div[6]/div/div[6]/button[1]', { timeout: 10000 });
             await renewBtn2.click();
             console.log("✅ 已点击悬浮框内的 Renew 按钮。");
