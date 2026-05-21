@@ -36,42 +36,42 @@ jobs:
         if [ -z "$PROXY_NODE" ]; then
             echo "[INFO] 未配置代理，尝试直连模式..."
             exit 0
-          fi
+        fi
           
           # 1. 下载并安装最新的 Sing-box 核心
-          TAG=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-          VERSION=${TAG#v}
-          wget -q "https://github.com/SagerNet/sing-box/releases/download/${TAG}/sing-box-${VERSION}-linux-amd64.tar.gz"
-          tar -xzf "sing-box-${VERSION}-linux-amd64.tar.gz"
-          mv "sing-box-${VERSION}-linux-amd64/sing-box" . && chmod +x sing-box
+        TAG=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        VERSION=${TAG#v}
+        wget -q "https://github.com/SagerNet/sing-box/releases/download/${TAG}/sing-box-${VERSION}-linux-amd64.tar.gz"
+        tar -xzf "sing-box-${VERSION}-linux-amd64.tar.gz"
+        mv "sing-box-${VERSION}-linux-amd64/sing-box" . && chmod +x sing-box
           
           # 2. 自动化协议解析脚本 (核心逻辑)
-          python3 << 'PYEOF'
-          import os, json, base64
-          from urllib.parse import urlparse, parse_qs, unquote
+        python3 << 'PYEOF'
+        import os, json, base64
+        from urllib.parse import urlparse, parse_qs, unquote
 
-          def generate_singbox_config():
-              url = os.environ.get("PROXY_NODE", "").strip()
-              p = urlparse(url)
-              scheme = p.scheme.lower()
-              params = {k: v[0] for k, v in parse_qs(p.query).items()}
+        def generate_singbox_config():
+            url = os.environ.get("PROXY_NODE", "").strip()
+            p = urlparse(url)
+            scheme = p.scheme.lower()
+            params = {k: v[0] for k, v in parse_qs(p.query).items()}
               
-              config = {
-                  "log": {"level": "info"},
-                  "inbounds": [{"type": "socks", "tag": "socks-in", "listen": "127.0.0.1", "listen_port": 10808}],
-                  "outbounds": []
+            config = {
+                "log": {"level": "info"},
+                "inbounds": [{"type": "socks", "tag": "socks-in", "listen": "127.0.0.1", "listen_port": 10808}],
+                "outbounds": []
               }
               
               # 提取账号基础信息
-              raw_auth = unquote(p.netloc.split('@')[0] if '@' in p.netloc else "")
-              server = p.hostname
-              port = int(p.port or 443)
-              sni = params.get("sni", server)
+            raw_auth = unquote(p.netloc.split('@')[0] if '@' in p.netloc else "")
+            server = p.hostname
+            port = int(p.port or 443)
+            sni = params.get("sni", server)
 
-              outbound = {"tag": "proxy", "server": server, "server_port": port}
+            outbound = {"tag": "proxy", "server": server, "server_port": port}
 
               # --- 分流逻辑 1: VLESS (针对普通 TLS + WS 优化) ---
-              if scheme == "vless":
+            if scheme == "vless":
                   outbound.update({
                       "type": "vless",
                       "uuid": raw_auth or p.username,
