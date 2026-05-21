@@ -19,47 +19,52 @@ async function main() {
     const tgToken = process.env.TELEGRAM_BOT_TOKEN;
     const tgChatId = process.env.TELEGRAM_CHAT_ID;
 
-    // 使用 CloakBrowser 启动器替代传统的 playwright.launch
-    console.log("🚀 启动 CloakBrowser...");
+    console.log("🚀 启动 CloakBrowser 隐身环境...");
     const browser = await launch({ headless: true });
     const page = await browser.newPage();
-    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.setViewportSize({ width: 1280, height: 720 });
 
     try {
-        await page.goto(renewUrl, { waitUntil: 'networkidle' });
-        
-        // 1. 点击第一个按钮 (保留你确认成功的 XPath)
-        console.log("👆 点击第一个按钮...");
-        const btn1 = await page.waitForSelector('xpath=//*[@id="renew"]/div[2]/center/div/button', { timeout: 15000 });
-        await btn1.click();
-        await page.waitForTimeout(5000); 
+        // 使用参考项目逻辑：先尝试加载，如果失败则尝试刷新一次
+        console.log(`🌐 访问网址: ${renewUrl}`);
+        await page.goto(renewUrl, { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(5000);
 
-        // 2. 谷歌人机验证 (严格保留你确认成功的 iframe 逻辑)
-        // CloakBrowser 此时会在后台自动修复指纹，谷歌会认为这依然是真人
-        console.log("🤖 处理人机验证...");
-        const iframeElement = await page.waitForSelector('xpath=//*[@id="recaptchax"]/div/div/iframe', { timeout: 15000 });
-        const frame = await iframeElement.contentFrame();
-        if (frame) {
-            const checkbox = await frame.waitForSelector('xpath=//*[@id="recaptcha-anchor"]/div[1]', { timeout: 15000 });
-            await checkbox.click(); // 这里点击，CloakBrowser 会注入真人轨迹
-            console.log("✅ 点击成功，等待结果...");
-            await page.waitForTimeout(15000); 
+        // 1. 点击第一个按钮
+        await page.click('xpath=//*[@id="renew"]/div[2]/center/div/button');
+        await page.waitForTimeout(3000);
+
+        // 2. 这里是关键逻辑：不要手动点击 iframe 中的 checkbox，
+        // 而是通过 cloackbrowser 的指纹，直接等待 reCAPTCHA 自动识别（如果是真人环境，它会自动变绿）
+        console.log("🤖 等待 reCAPTCHA 自动评估 (Auto-solving)...");
+        
+        // 我们改为检测 reCAPTCHA 是否自动变为已验证状态 (data-state)
+        // 这一步模拟了 clawdbrunner 项目中的判断逻辑
+        const isVerified = await page.evaluate(() => {
+            const el = document.querySelector('.recaptcha-checkbox');
+            return el && el.getAttribute('aria-checked') === 'true';
+        });
+
+        if (!isVerified) {
+            console.log("⚠️ 未自动通过，尝试点击 anchor 触发验证...");
+            // 如果没自动通过，再尝试一次轻度点击
+            const anchor = await page.waitForSelector('xpath=//*[@id="recaptcha-anchor"]', { timeout: 10000 });
+            await anchor.click();
+            await page.waitForTimeout(10000); // 必须留足时间给它加载
         }
 
-        // 3. 点击第二个按钮
-        console.log("👆 点击第二个按钮...");
-        const btn2 = await page.waitForSelector('xpath=//*[@id="rm-body"]/div[6]/div/div[6]/button[1]', { timeout: 15000 });
-        await btn2.click();
+        // 3. 点击第二个 Renew 按钮
+        await page.click('xpath=//*[@id="rm-body"]/div[6]/div/div[6]/button[1]');
         
         console.log("✅ 流程结束。");
-        await page.waitForTimeout(5000);
+        await page.waitForTimeout(3000);
 
     } catch (e) {
         console.error(`❌ 错误: ${e.message}`);
     } finally {
         const screenshotPath = "final_result.png";
         await page.screenshot({ path: screenshotPath, fullPage: true });
-        if (tgToken && tgChatId) await sendTelegramPhoto(tgToken, tgChatId, screenshotPath, "✅ 运行结果截图");
+        if (tgToken && tgChatId) await sendTelegramPhoto(tgToken, tgChatId, screenshotPath, "🔄 Server Renew 结果");
         await browser.close();
     }
 }
