@@ -36,23 +36,23 @@ jobs:
         chmod +x gost-linux-amd64-2.11.5
         
         # 启动 Gost 隧道
-        echo "🔗 正在启动 Gost 隧道..."
-        ./gost-linux-amd64-2.11.5 -L=http://:1080 -F="${{ secrets.SOCKS5_URL }}" > gost.log 2>&1 &
+    #    echo "🔗 正在启动 Gost 隧道..."
+    #    ./gost-linux-amd64-2.11.5 -L=http://:1080 -F="${{ secrets.SOCKS5_URL }}" > gost.log 2>&1 &
         
         # 等待隧道启动
-        sleep 5
+    #    sleep 5
         
         # 验证代理连通性并设置环境变量
-        if curl -I -s --max-time 15 -x http://127.0.0.1:1080 https://www.google.com > /dev/null; then
-          echo "✅ Gost 代理启动成功！"
-          echo "ALL_PROXY=http://127.0.0.1:1080" >> $GITHUB_ENV
-          echo "http_proxy=http://127.0.0.1:1080" >> $GITHUB_ENV
-          echo "https_proxy=http://127.0.0.1:1080" >> $GITHUB_ENV
-        else
-          echo "❌ Gost 代理连接失败，请检查 SOCKS5_URL 配置。"
-          cat gost.log
-          exit 1
-        fi
+     #   if curl -I -s --max-time 15 -x http://127.0.0.1:1080 https://www.google.com > /dev/null; then
+     #     echo "✅ Gost 代理启动成功！"
+     #     echo "ALL_PROXY=http://127.0.0.1:1080" >> $GITHUB_ENV
+     #     echo "http_proxy=http://127.0.0.1:1080" >> $GITHUB_ENV
+     #     echo "https_proxy=http://127.0.0.1:1080" >> $GITHUB_ENV
+     #   else
+     #     echo "❌ Gost 代理连接失败，请检查 SOCKS5_URL 配置。"
+     #     cat gost.log
+     #     exit 1
+     #   fi
 
     - name: Run Renew Script
       env:
