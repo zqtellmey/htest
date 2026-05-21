@@ -11,19 +11,8 @@ async function sendTelegramPhoto(token, chatId, photoPath, caption) {
         form.append('chat_id', chatId);
         form.append('caption', caption);
         form.append('photo', fs.createReadStream(photoPath));
-
-        const response = await axios.post(url, form, {
-            headers: form.getHeaders()
-        });
-        
-        if (response.data.ok) {
-            console.log("✅ 截图已成功发送至 Telegram。");
-        } else {
-            console.log(`❌ Telegram 发送失败: ${JSON.stringify(response.data)}`);
-        }
-    } catch (error) {
-        console.error(`❌ 发送 Telegram 消息时发生错误: ${error.message}`);
-    }
+        await axios.post(url, form, { headers: form.getHeaders() });
+    } catch (e) { console.error(e); }
 }
 
 async function main() {
@@ -31,80 +20,54 @@ async function main() {
     const tgToken = process.env.TELEGRAM_BOT_TOKEN;
     const tgChatId = process.env.TELEGRAM_CHAT_ID;
 
-    if (!renewUrl) {
-        console.error("❌ 未找到 RENEW_URL 环境变量。");
-        return;
-    }
-
-    console.log("🚀 启动 CloakBrowser 隐身浏览器...");
+    console.log("🚀 启动 CloakBrowser 隐身浏览器 (模仿真人)...");
     const browser = await launch({ headless: true });
     const page = await browser.newPage();
-    await page.setViewportSize({ width: 1920, height: 1080 });
-
-    console.log("🛡️ 正在配置去广告拦截...");
-    const adDomains = ['googlesyndication.com', 'doubleclick.net', 'googleadservices.com', 'popads.net', 'propellerads.com', 'monetag.com', 'a-ads.com', 'mellowads.com'];
-    await page.route('**/*', route => {
-        adDomains.some(domain => route.request().url().includes(domain)) ? route.abort() : route.continue();
-    });
+    
+    // 设置合理的页面尺寸
+    await page.setViewportSize({ width: 1280, height: 720 });
 
     try {
         console.log(`🌐 正在访问: ${renewUrl}`);
-        await page.goto(renewUrl, { waitUntil: 'networkidle', timeout: 60000 });
-        await page.waitForTimeout(5000); 
+        // 核心：保持官方例子中的 networkidle 等待，确保环境稳定
+        await page.goto(renewUrl, { waitUntil: 'networkidle' });
+        
+        // 1. 点击第一个 Renew 按钮
+        console.log("👆 点击第一个 Renew 按钮...");
+        const renewBtn1 = await page.waitForSelector('xpath=//*[@id="renew"]/div[2]/center/div/button', { timeout: 15000 });
+        await renewBtn1.click();
+        
+        // 按照官方例子的精髓：这里不要去碰 iframe，直接等待 reCAPTCHA 自动评估
+        console.log("⏳ 正在触发 reCAPTCHA 评估 (等待 5 秒)...");
+        await new Promise(r => setTimeout(r, 5000)); 
 
-        // 1. 处理隐私框
-        try {
-            const consentBtn = await page.$("button.fc-button.fc-cta-consent.fc-primary-button");
-            if (consentBtn) { await consentBtn.click(); await page.waitForTimeout(2000); }
-        } catch (e) { console.log("ℹ️ 无需处理隐私框"); }
-
-        // 2. 点击第一个 Renew 按钮 (加入强制点击)
-        try {
-            console.log("👆 准备点击第一个 Renew 按钮...");
-            const renewBtn1 = await page.waitForSelector('xpath=//*[@id="renew"]/div[2]/center/div/button', { timeout: 15000 });
-            await renewBtn1.click({ force: true });
-            console.log("✅ 已点击第一个 Renew 按钮，等待加载...");
-            await page.waitForTimeout(8000); // 增加等待时间，防止转圈过久
-        } catch (e) {
-            console.error(`❌ 点击第一个 Renew 按钮失败: ${e.message}`);
+        // 2. 尝试点击验证框 (如果它是主文档可见元素)
+        // 按照官方逻辑，如果我们需要触发评分，就直接找那个触发验证的容器
+        // 如果这里直接通过，说明 CloakBrowser 指纹成功了
+        const checkbox = await page.$('xpath=//*[@id="recaptcha-anchor"]');
+        if (checkbox) {
+            console.log("✅ 发现验证框，执行点击...");
+            await checkbox.click();
+            await new Promise(r => setTimeout(r, 5000));
         }
 
-        // 3. 谷歌人机验证
-        console.log("🤖 开始处理谷歌人机验证...");
-        try {
-            const iframeElement = await page.waitForSelector('xpath=//*[@id="recaptchax"]/div/div/iframe', { timeout: 20000 });
-            const frame = await iframeElement.contentFrame();
-            if (frame) {
-                const recaptchaCheckbox = await frame.waitForSelector('xpath=//*[@id="recaptcha-anchor"]/div[1]', { timeout: 15000 });
-                await recaptchaCheckbox.click();
-                console.log("✅ 已点击人机验证，等待验证通过...");
-                await page.waitForTimeout(15000); // 增加验证等待时长
-            }
-        } catch (e) {
-            console.error(`❌ 人机验证失败: ${e.message}`);
-        }
-
-        // 4. 点击第二个 Renew 按钮
-        try {
-            console.log("👆 准备点击第二个 Renew 按钮...");
-            const renewBtn2 = await page.waitForSelector('xpath=//*[@id="rm-body"]/div[6]/div/div[6]/button[1]', { timeout: 15000 });
-            await renewBtn2.click({ force: true });
-            console.log("✅ 已点击悬浮框内的 Renew 按钮。");
-            await page.waitForTimeout(15000); // 增加等待时间以确保请求完成
-        } catch (e) {
-            console.error(`❌ 点击第二个 Renew 按钮失败: ${e.message}`);
-        }
+        // 3. 点击第二个 Renew 按钮
+        console.log("👆 点击第二个 Renew 按钮...");
+        const renewBtn2 = await page.waitForSelector('xpath=//*[@id="rm-body"]/div[6]/div/div[6]/button[1]', { timeout: 10000 });
+        await renewBtn2.click();
+        
+        console.log("✅ 操作流程执行完毕。");
+        await new Promise(r => setTimeout(r, 5000));
 
     } catch (e) {
-        console.error(`❌ 运行过程中发生错误: ${e.message}`);
+        console.error(`❌ 发生错误: ${e.message}`);
     } finally {
-        const screenshotPath = "renew_result.png";
+        const screenshotPath = "final_result.png";
         await page.screenshot({ path: screenshotPath, fullPage: true });
         if (tgToken && tgChatId) {
-            await sendTelegramPhoto(tgToken, tgChatId, screenshotPath, "🔄 Server Renew 自动化脚本执行完毕。");
+            await sendTelegramPhoto(tgToken, tgChatId, screenshotPath, "🔄 Server Renew 自动化操作结果。");
         }
         await browser.close();
-        console.log("🛑 任务结束。");
     }
 }
 
