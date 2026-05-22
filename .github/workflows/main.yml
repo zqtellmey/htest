@@ -12,17 +12,18 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Set up Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
 
     - name: Install dependencies
       run: |
         npm install
 
+    # 修正后的安装顺序：先 install 依赖，再装浏览器，不会再有警告
     - name: Install Playwright Browsers
       run: |
         npx playwright install chromium
