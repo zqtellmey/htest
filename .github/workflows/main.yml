@@ -1,9 +1,9 @@
 name: Auto Renew Server
 
 on:
-  schedule:
+ # schedule:
     # 每天 UTC 时间凌晨 2:00 运行一次
-    - cron: '0 2 * * *'
+ #   - cron: '0 2 * * *'
   workflow_dispatch: # 允许手动触发
 
 jobs:
